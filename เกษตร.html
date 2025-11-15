@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🧑‍🌾 ระบบค้นหาคนรับจ้างด้านการเกษตร (Agri-Job Finder)</title>
+    
+    <style>
+        /* -------------------------------------- */
+        /* CSS หลักสำหรับ Layout */
+        /* -------------------------------------- */
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f4f9;
+        }
+        .container {
+            max-width: 1000px;
+            margin: auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #1e7e34;
+            text-align: center;
+        }
+        .search-area {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #e9ffed;
+            align-items: center;
+        }
+        .search-area button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        /* -------------------------------------- */
+        /* CSS สำหรับ Modal/Popup */
+        /* -------------------------------------- */
+        .modal {
+            display: none; 
+            position: fixed; 
+            z-index: 1000; 
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.7); 
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: 5% auto; 
+            padding: 20px;
+            border: 1px solid #888;
+            width: 90%;
+            max-width: 900px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2);
+            animation-name: animatetop;
+            animation-duration: 0.4s
+        }
+        @keyframes animatetop {
+            from {top: -300px; opacity: 0}
+            to {top: 5%; opacity: 1}
+        }
+        .close-btn {
+            color: #aaa;
+            float: right;
+            font-size: 36px;
+            font-weight: bold;
+        }
+        .close-btn:hover, .close-btn:focus {
+            color: #000;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        /* -------------------------------------- */
+        /* CSS สำหรับแผนที่และ Job Card ใน Modal */
+        /* -------------------------------------- */
+        .content-layout {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap; /* ให้หดลงมาเมื่อจอเล็ก */
+        }
+        .results-list {
+            flex: 1; 
+            min-width: 350px;
+        }
+        .map-column {
+            flex: 1; 
+            min-width: 400px;
+        }
+        #map-container {
+            width: 100%;
+            height: 350px; 
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+        .job-card {
+            border: 1px solid #ccc;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            background-color: #fff;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+        .job-card h3 {
+            color: #0056b3;
+            margin-top: 0;
+        }
+        .job-card span {
+            font-weight: bold;
+            color: #333;
+        }
+        .job-card button {
+            background-color: #1e7e34;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            float: right;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>🔍 ค้นหาคนรับจ้าง/เครื่องจักรทางการเกษตร</h1>
+        <p>ระบุประเภทงานและจังหวัดที่ต้องการจ้าง เพื่อค้นหาผู้รับจ้างในพื้นที่</p>
+
+        <div class="search-area">
+            <label for="job-type">ประเภทงาน:</label>
+            <select id="job-type" name="job-type">
+                <option value="">-- เลือกประเภทงาน --</option>
+                <option value="เกี่ยวข้าว">เกี่ยวข้าว (คน)</option>
+                <option value="รถเกี่ยว">ขับรถเกี่ยว/บริการรถเกี่ยว</option>
+                <option value="ดำนา">ดำนา/ปักดำ (คน)</option>
+                <option value="รถดำนา">บริการรถดำนา</option>
+                <option value="ไถนา">ไถนา/เตรียมดิน</option>
+                <option value="ฉีดยา">ฉีดพ่นสารเคมี/โดรน</option>
+                <option value="อื่นๆ">อื่นๆ</option>
+            </select>
+
+            <label for="location">พื้นที่/จังหวัด:</label>
+            <input type="text" id="location" name="location" placeholder="เช่น เลย หรือ ขอนแก่น">
+
+            <button onclick="searchJobs()">ค้นหา</button>
+        </div>
+        
+        <p></p>
+    </div>
+
+    <div id="resultsModal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeModal()">&times;</span>
+            <h2>✅ ผลลัพธ์การค้นหาในพื้นที่: <span id="modalLocationHeader"></span></h2>
+            <p><strong>ประเภทงานที่ค้นหา:</strong> <span id="modalJobTypeHeader"></span></p>
+
+            <div class="content-layout">
+                
+                <div class="results-list">
+                    <div id="modalResultsBody">
+                        <div class="job-card">
+                            <h3>นายวิชัย พืชผล (ทีมงานดำนา)</h3>
+                            <p><span>ประเภทงาน:</span> ดำนา/ปักดำ | <span>พื้นที่บริการ:</span> **จังหวัดเลย**</p>
+                            <p>ประสบการณ์กว่า 10 ปี รับประกันผลงาน รวดเร็วทันเวลา</p>
+                            <button onclick="contact(4)">ติดต่อ</button>
+                        </div>
+                        <div class="job-card">
+                            <h3>บริษัท สยามเกี่ยวข้าว จำกัด</h3>
+                            <p><span>ประเภทงาน:</span> บริการรถเกี่ยว | <span>พื้นที่บริการ:</span> **จังหวัดขอนแก่น**</p>
+                            <p>รถเกี่ยวรุ่นใหม่ ระบบ GPS แม่นยำ รับงานทั่วภาคอีสาน</p>
+                            <button onclick="contact(5)">ติดต่อ</button>
+                        </div>
+                        </div>
+                </div>
+
+                <div class="map-column">
+                    <h2>📍 แผนที่พื้นที่บริการ</h2>
+                    <div id="map-container">
+                        <iframe 
+                            id="map-iframe"
+                            width="100%" 
+                            height="100%" 
+                            frameborder="0" 
+                            style="border:0" 
+                            src="http://googleusercontent.com/maps.google.com/5" 
+                            allowfullscreen>
+                        </iframe>
+                    </div>
+                    <small>แผนที่แสดงพื้นที่ของ **<span id="mapLocationName">ประเทศไทย</span>**</small>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script>
+       // ฟังก์ชันเปิด Modal
+function openModal() {
+    document.getElementById('resultsModal').style.display = 'block';
+}
+
+// ฟังก์ชันปิด Modal
+function closeModal() {
+    document.getElementById('resultsModal').style.display = 'none';
+}
+
+// ฟังก์ชันอัปเดตแผนที่ (ใช้วิธี Google Maps Embed แบบไม่ต้องใช้ API Key)
+function updateMap(locationName) {
+    const mapIframe = document.getElementById('map-iframe');
+    
+    // ตั้งค่า URL พื้นฐานของ Google Maps Embed API
+    const baseUrl = 'https://www.google.com/maps/embed/v1/place?key=&q='; // **หมายเหตุ:** เราเว้น 'key=' ไว้ หากคุณตัดสินใจเพิ่ม API Key ในภายหลัง
+
+    if (locationName) {
+        // 1. สร้าง Query สำหรับค้นหาจังหวัด (เช่น "ขอนแก่น จังหวัด")
+        const searchQuery = encodeURIComponent(locationName + ' จังหวัด');
+        
+        // 2. สร้าง URL จริง: ใช้ 'place' เพื่อค้นหาสถานที่และใช้ 'zoom=10'
+        // เราใช้ output=embed และ zoom=10 เพื่อให้แสดงผลและซูมที่จังหวัด
+        const mapUrl = `${baseUrl}${searchQuery}&zoom=10`;
+        
+        mapIframe.src = mapUrl;
+        document.getElementById('mapLocationName').innerText = locationName + ' จังหวัด';
+    } else {
+        // แผนที่ประเทศไทยเริ่มต้น (ใช้คำว่า Thailand)
+        const defaultUrl = `${baseUrl}Thailand&zoom=5`;
+        
+        mapIframe.src = defaultUrl;
+        document.getElementById('mapLocationName').innerText = 'ประเทศไทย';
+    }
+}
+
+// ฟังก์ชันหลักเมื่อกดค้นหา
+function searchJobs() {
+    const jobType = document.getElementById('job-type').value;
+    const locationInput = document.getElementById('location').value.trim();
+    
+    // 1. อัปเดตแผนที่ใน Modal
+    updateMap(locationInput); 
+
+    // 2. อัปเดต Header ใน Modal
+    document.getElementById('modalJobTypeHeader').innerText = jobType || 'ทุกประเภทงาน';
+    document.getElementById('modalLocationHeader').innerText = locationInput || 'ทุกพื้นที่';
+    
+    // 3. เปิด Popup/Modal
+    openModal();
+
+    // 4. ตั้งค่าให้ปิด Modal เมื่อผู้ใช้คลิกนอกกล่อง (เพิ่มประสบการณ์ผู้ใช้)
+    window.onclick = function(event) {
+        const modal = document.getElementById('resultsModal');
+        if (event.target == modal) {
+            closeModal();
+        }
+    }
+}
+
+// ฟังก์ชันจำลองการติดต่อ
+function contact(jobId) {
+    alert("คุณกำลังติดต่อผู้รับจ้าง ID: " + jobId + " (ในโปรแกรมจริงจะแสดงเบอร์โทร/ลิงก์แชท)");
+}
+
+// กำหนดให้แผนที่แสดงประเทศไทยเป็นค่าเริ่มต้นเมื่อโหลดหน้า
+document.addEventListener('DOMContentLoaded', () => {
+     updateMap(""); 
+});
+    </script>
+</body>
+</html>
